@@ -38,6 +38,20 @@
   ::-webkit-scrollbar{width:9px;height:9px}::-webkit-scrollbar-thumb{background:#2a2a38;border-radius:9px}
   .pulse{animation:p 1.4s ease-in-out infinite}@keyframes p{0%,100%{opacity:.4}50%{opacity:1}}
   .fade{animation:f .35s ease}@keyframes f{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  /* agent graph */
+  .anode{position:relative;border:1px solid rgba(255,255,255,.09);border-radius:12px;background:#14141d;padding:.7rem .8rem;transition:all .3s;cursor:pointer;min-height:78px}
+  .anode:hover{border-color:rgba(129,140,248,.5)}
+  .anode .dot{width:8px;height:8px;border-radius:99px;background:#3a3a48;transition:all .3s}
+  .anode.idle{opacity:.62}
+  .anode.running{border-color:#60a5fa;box-shadow:0 0 0 1px rgba(96,165,250,.5),0 0 24px -6px rgba(96,165,250,.6)}
+  .anode.running .dot{background:#60a5fa;animation:p 1s ease-in-out infinite}
+  .anode.done{border-color:rgba(52,211,153,.45)}
+  .anode.done .dot{background:#34d399}
+  .anode .metric{font-family:"JetBrains Mono",monospace;font-size:.72rem}
+  .arrow{color:#33333f;align-self:center;font-size:1.1rem;transition:color .3s}
+  .arrow.lit{color:#60a5fa}
+  .gband{border:1px dashed rgba(129,140,248,.35);border-radius:12px;background:rgba(129,140,248,.05)}
+  .selnode{outline:2px solid #818cf8 !important}
 </style>
 </head>
 <body class="text-slate-200 font-sans min-h-screen">
@@ -63,8 +77,8 @@
 
 <script>
 const TABS = [
-  ['radar','Radar Feed'], ['workbench','Obligation Workbench'], ['impact','Impact Map'],
-  ['memo','Memo Studio'], ['audit','Audit & Trace'],
+  ['graph','Agent Graph'], ['radar','Radar Feed'], ['workbench','Obligation Workbench'],
+  ['impact','Impact Map'], ['memo','Memo Studio'], ['audit','Audit & Trace'],
 ];
 let STATE=null, DOC=null, AUDIT=null;
 const $ = (h)=>{const t=document.createElement('template');t.innerHTML=h.trim();return t.content.firstChild;};
@@ -83,12 +97,135 @@ async function boot(){
     const b=$(`<button class="tab hair rounded-lg px-3 py-1.5 text-muted hover:text-white transition" data-id="${id}">${label}</button>`);
     b.onclick=()=>go(id); nav.appendChild(b);
   });
-  go('radar');
+  go('graph');
 }
 function go(id){
+  if(window._es){try{window._es.close()}catch(e){}}
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.id===id));
   const s=document.getElementById('screen'); s.classList.remove('fade'); void s.offsetWidth; s.classList.add('fade');
-  ({radar:radar,workbench:workbench,impact:impact,memo:memo,audit:audit})[id]();
+  ({graph:agentGraph,radar:radar,workbench:workbench,impact:impact,memo:memo,audit:audit})[id]();
+}
+
+/* ---------------- Agent Graph ---------------- */
+const AGENTS = {
+  supervisor:{name:'Supervisor / Router',icon:'🧭',model:'LangGraph',
+    role:'Conducts the graph. Routes by status, confidence and verifier results; sends low-confidence or verifier-failed states to a human gate. Never makes domain calls itself.',
+    tools:'LangGraph supervisor + checkpointer'},
+  monitor:{name:'Source-Monitor',icon:'📡',model:'Groq Llama (classify)',
+    role:'Watches the firehose: polls the CELLAR Atom feed + partner feeds (EBA/ESMA/BaFin/ECB), dedups by CELEX + content hash, classifies what is in scope.',
+    tools:'CELLAR Atom/RSS · SPARQL · dedup store'},
+  parser:{name:'Parser / Intake',icon:'📑',model:'rule-based (+ LLM for PDF)',
+    role:'Turns law into structure: fetches the document, segments it into chapters → articles → paragraphs → points, tags language, resolves cross-references. Bronze → Silver.',
+    tools:'Formex/lxml · EUR-Lex XHTML · OCR fallback'},
+  obligation:{name:'Obligation-Extraction',icon:'⚖️',model:'Cerebras/Groq/Gemini (temp 0)',
+    role:'Pulls the "shalls": for each article extracts discrete obligations — actor, modal force, action, conditions, type — each with a verbatim source anchor. The highest-value reasoning step.',
+    tools:'RAG over article text · obligation taxonomy · schema-validated JSON'},
+  guardrail:{name:'Guardrail + Citation-Verifier',icon:'🛡️',model:'deterministic (Python)',
+    role:'Wraps every agent. Programmatically verifies every citation against the pinned source (article must exist + anchor quote must appear). Failures are rejected and routed to a human gate. No unverified legal claim ever reaches the user.',
+    tools:'fuzzy citation match · PII/scope policy · append-only audit'},
+  impact:{name:'Impact-Mapping',icon:'🎯',model:'deterministic matcher + LLM',
+    role:'Maps each obligation onto the bank: affected function, system, process, and existing control — or flags a gap (no covering control). Turns "a regulation exists" into "you must do X to system Y".',
+    tools:'Synthetic Bank Profile · Control Library · theme matcher'},
+  prioritize:{name:'Prioritization',icon:'📊',model:'Python (LLM inputs)',
+    role:'Scores each obligation by deadline proximity, effort (gap size) and risk (supervisory exposure). priority = f(deadline, effort, risk), computed in code. Produces the ranked action list.',
+    tools:'deadline calendar · effort/risk rubric'},
+  memo:{name:'Memo-Drafting',icon:'📝',model:'Cerebras/Gemini (low temp)',
+    role:'Writes the deliverable: the gap-assessment memo with executive summary, obligations, mapped impacts/gaps, prioritized actions and a full citation appendix (EN/DE). Stops at a human approval gate.',
+    tools:'memo templates · DOCX/PDF export'},
+  audit:{name:'Audit & Trace',icon:'🧾',model:'Langfuse-style',
+    role:'Append-only provenance for every decision: model, prompt, evidence, confidence, verifier verdict, corpus version. The reproducibility + trust substrate.',
+    tools:'immutable decision log · pinned corpus version'},
+};
+const NODE_STATE={};
+function agentGraph(){
+  Object.keys(AGENTS).forEach(k=>NODE_STATE[k]={status:'idle',metric:'',detail:''});
+  const c=STATE.counters;
+  const nodeHtml=(id)=>{const a=AGENTS[id];return `<div class="anode idle" id="n-${id}" data-id="${id}">
+      <div class="flex items-center gap-2"><span class="dot"></span><span>${a.icon}</span>
+        <span class="text-[13px] font-medium leading-tight">${a.name}</span></div>
+      <div class="text-[11px] text-muted mt-1 leading-snug" id="d-${id}">${a.role.slice(0,52)}…</div>
+      <div class="metric text-accent mt-1" id="m-${id}"></div></div>`;};
+  const arrow=(id)=>`<div class="arrow" id="a-${id}">→</div>`;
+  document.getElementById('screen').innerHTML=`
+    <div class="flex items-center gap-3 mb-4">
+      <button id="run" class="bg-accent2 hover:bg-indigo-500 text-white text-sm rounded-lg px-4 py-2">▶ Run pipeline live</button>
+      <div id="runstatus" class="text-sm text-muted">Watch the agent graph reason over the regulation in real time. Click any agent to inspect its role and output.</div>
+    </div>
+    <div class="grid lg:grid-cols-3 gap-4">
+      <div class="lg:col-span-2 space-y-3">
+        <div>${nodeHtml('supervisor')}</div>
+        <div class="text-[11px] uppercase tracking-wider text-muted mt-2">Pipeline</div>
+        <div class="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr_auto_1fr] gap-2 items-stretch">
+          ${nodeHtml('monitor')}${arrow('1')}${nodeHtml('parser')}${arrow('2')}${nodeHtml('obligation')}
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr_auto_1fr] gap-2 items-stretch">
+          ${nodeHtml('impact')}${arrow('3')}${nodeHtml('prioritize')}${arrow('4')}${nodeHtml('memo')}
+        </div>
+        <div class="gband p-2 grid md:grid-cols-2 gap-2">
+          <div class="text-[11px] uppercase tracking-wider text-muted col-span-full px-1">Cross-cutting</div>
+          ${nodeHtml('guardrail')}${nodeHtml('audit')}
+        </div>
+      </div>
+      <div class="space-y-3">
+        <div class="card p-3">
+          <div class="text-[11px] uppercase tracking-wider text-muted mb-1">Inspector</div>
+          <div id="inspector" class="text-[13px] text-muted">Click an agent node to see what it does and what it produced this run.</div>
+        </div>
+        <div class="card p-3">
+          <div class="text-[11px] uppercase tracking-wider text-muted mb-1">Live verifier feed</div>
+          <div id="vfeed" class="space-y-1 text-[12px] mono max-h-[280px] overflow-auto text-muted">idle — press “Run pipeline live”.</div>
+        </div>
+      </div>
+    </div>`;
+  document.querySelectorAll('.anode').forEach(n=>n.onclick=()=>inspect(n.dataset.id));
+  document.getElementById('run').onclick=runGraph;
+  inspect('supervisor');
+}
+function setNode(id,status,metric,detail){
+  const n=document.getElementById('n-'+id); if(!n)return;
+  n.classList.remove('idle','running','done'); n.classList.add(status);
+  if(metric!==undefined&&metric!==''){const m=document.getElementById('m-'+id);if(m)m.textContent=metric;}
+  if(detail){const d=document.getElementById('d-'+id);if(d)d.textContent=detail;}
+  NODE_STATE[id]={status,metric:metric||NODE_STATE[id].metric,detail:detail||NODE_STATE[id].detail};
+  if(document.querySelector('.selnode')?.dataset.id===id) inspect(id);
+}
+function inspect(id){
+  const a=AGENTS[id]; const st=NODE_STATE[id]||{};
+  document.querySelectorAll('.anode').forEach(n=>n.classList.toggle('selnode',n.dataset.id===id));
+  const statusColor={idle:'#8a8a99',running:'#60a5fa',done:'#34d399'}[st.status||'idle'];
+  document.getElementById('inspector').innerHTML=`
+    <div class="flex items-center gap-2 mb-1"><span>${a.icon}</span><span class="font-medium text-white">${a.name}</span>
+      ${chip(st.status||'idle',statusColor)}</div>
+    <div class="text-[12px] text-slate-300 leading-relaxed">${a.role}</div>
+    <div class="text-[11px] text-muted mt-2">model: <span class="text-slate-300">${a.model}</span></div>
+    <div class="text-[11px] text-muted">tools: <span class="text-slate-300">${a.tools}</span></div>
+    ${st.metric?`<div class="mt-2 mono text-[12px] text-accent">▸ this run: ${st.metric}</div>`:''}`;
+}
+function runGraph(){
+  if(window._es){try{window._es.close()}catch(e){}}
+  Object.keys(AGENTS).forEach(k=>setNode(k,'idle',''));
+  document.querySelectorAll('.arrow').forEach(a=>a.classList.remove('lit'));
+  const vf=document.getElementById('vfeed'); vf.innerHTML='';
+  document.getElementById('runstatus').innerHTML=chip('running…','#60a5fa');
+  const arrowsFor={parser:'1',obligation:'2',impact:'3',memo:'4'};
+  const es=new EventSource('/api/stream'); window._es=es;
+  es.onmessage=(e)=>{
+    const d=JSON.parse(e.data);
+    if(d.type==='node'){
+      setNode(d.id,d.status,d.metric,d.detail);
+      if(d.status==='done'&&arrowsFor[d.id]){const ar=document.getElementById('a-'+arrowsFor[d.id]);if(ar)ar.classList.add('lit');}
+    } else if(d.type==='verify'){
+      const tc=TYPE_COLORS[d.obligation_type]||'#94a3b8';
+      const row=$(`<div class="fade flex items-start gap-2"><span class="text-ok">✓</span><span class="text-muted shrink-0">${d.article}</span><span class="truncate text-slate-300">${d.action}</span></div>`);
+      vf.appendChild(row); vf.scrollTop=vf.scrollHeight;
+    } else if(d.type==='verify_more'){
+      vf.appendChild($(`<div class="text-muted">… +${d.count} more obligations verified</div>`)); vf.scrollTop=vf.scrollHeight;
+    } else if(d.type==='done'){
+      document.getElementById('runstatus').innerHTML=chip('pipeline complete','#34d399')+' <span class="text-[12px] text-muted ml-1">open Impact Map / Memo Studio to act on it</span>';
+      es.close();
+    }
+  };
+  es.onerror=()=>{es.close();document.getElementById('runstatus').innerHTML=chip('stream ended','#fbbf24');};
 }
 
 /* ---------------- Radar Feed ---------------- */

@@ -63,6 +63,10 @@ def _openrouter_available() -> bool:
     return bool(config.OPENROUTER_API_KEY)
 
 
+def _cerebras_available() -> bool:
+    return bool(config.CEREBRAS_API_KEY)
+
+
 def _ollama_available() -> bool:
     try:
         import httpx
@@ -75,10 +79,22 @@ def _ollama_available() -> bool:
 
 # Ordered chain. "reason" workhorse uses Gemini-first per the blueprint; Groq is the
 # fast classifier. Here we keep one general chain and let callers pick a role hint.
+# OpenRouter free models rotated so a 429 on one falls through to the next,
+# spreading bulk load across providers (Part 11.4/11.5).
+_OPENROUTER_FREE = (
+    "openrouter/z-ai/glm-4.5-air:free",
+    "openrouter/qwen/qwen3-next-80b-a3b-instruct:free",
+    "openrouter/meta-llama/llama-3.3-70b-instruct:free",
+    "openrouter/qwen/qwen3-coder:free",
+)
+
 DEFAULT_CHAIN: tuple[Provider, ...] = (
+    # Cerebras first for bulk work — large free tier, very fast inference.
+    Provider("cerebras:glm", "cerebras/zai-glm-4.7", _cerebras_available),
+    Provider("cerebras:gpt-oss", "cerebras/gpt-oss-120b", _cerebras_available),
     Provider("groq", "groq/llama-3.3-70b-versatile", _groq_available),
+    *(Provider(f"openrouter:{m.split('/')[1]}", m, _openrouter_available) for m in _OPENROUTER_FREE),
     Provider("gemini", "gemini/gemini-2.5-flash", _gemini_available),
-    Provider("openrouter", "openrouter/meta-llama/llama-3.3-70b-instruct:free", _openrouter_available),
     Provider("ollama", "ollama/qwen2.5", _ollama_available),
 )
 
@@ -124,7 +140,13 @@ class Router:
                     temperature=temp,
                 )
                 dt = (time.perf_counter() - t0) * 1000
-                text = resp["choices"][0]["message"]["content"]
+                msg = resp["choices"][0]["message"]
+                # Reasoning models sometimes return empty `content` (answer lands in
+                # `reasoning_content`). Treat a blank/None body as a provider miss and
+                # fall through, rather than passing None downstream.
+                text = msg.get("content") or msg.get("reasoning_content") or ""
+                if not text.strip():
+                    raise ValueError(f"empty content from {provider.model}")
                 tokens = (resp.get("usage") or {}).get("total_tokens")
                 cache.put(prompt, temp, {"text": text, "model": provider.model, "tokens": tokens})
                 return LLMResult(text, provider.name, provider.model, dt, tokens)
@@ -179,7 +201,7 @@ class Router:
 
 def _extract_json(text: str) -> str:
     """Pull the first JSON object/array out of a possibly chatty LLM response."""
-    text = text.strip()
+    text = (text or "").strip()
     if text.startswith("```"):
         text = re.sub(r"^```[a-zA-Z]*\n?", "", text)
         text = re.sub(r"\n?```$", "", text)

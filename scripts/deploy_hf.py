@@ -66,7 +66,7 @@ def main() -> int:
 
     # Secrets (fallback for cache misses) + runtime config. Secrets are not visible
     # to Space visitors; only the container sees them.
-    for key in ("GROQ_API_KEY", "GOOGLE_API_KEY"):
+    for key in ("GROQ_API_KEY", "GOOGLE_API_KEY", "OPENROUTER_API_KEY", "CEREBRAS_API_KEY"):
         val = os.getenv(key)
         if val:
             api.add_space_secret(repo_id=repo_id, key=key, value=val)

@@ -179,34 +179,75 @@ def memo_export(format: str = "html", language: str = "en"):
 
 @app.get("/api/stream")
 async def stream():
-    """Replay the agent pipeline as SSE events for the live console feel."""
+    """Drive the Agent Graph: emit node start/done + per-claim verifier events with
+    the real metrics from this run, paced for live animation."""
     s = svc.state()
+    parsed = s["parsed_doc"]
     obls = s["obligations"]
     links = s["impact_links"]
-    gaps = sum(1 for l in links if l.is_gap)
+    prio = s["prioritized"]
+    rejected = sum(1 for f in s["flags"] if f.kind.value == "verifier_rejected")
+    gaps = sum(1 for l in links if l.status == "gap")
+    covered = sum(1 for l in links if l.status == "covered")
+    unmapped = sum(1 for l in links if l.status == "unmapped")
+    top = prio[0].obligation_id if prio else "—"
+
+    def node(id, status, metric="", detail=""):
+        return _sse({"type": "node", "id": id, "status": status, "metric": metric, "detail": detail})
 
     async def gen():
-        steps = [
-            ("monitor", "Source-Monitor", f"caught {s['parsed_doc'].celex} off the feed"),
-            ("parser", "Parser / Intake", f"segmented {len(s['parsed_doc'].articles)} articles → Silver"),
-            ("extraction", "Obligation-Extraction", f"extracting obligations (temp 0)…"),
-        ]
-        for kind, agent, msg in steps:
-            yield _sse({"type": "agent", "kind": kind, "agent": agent, "message": msg})
-            await asyncio.sleep(0.45)
-        for o in obls:
-            yield _sse({"type": "obligation", "id": o.id, "article": o.citation.article_ref,
-                        "verified": True, "obligation_type": o.obligation_type.value})
-            await asyncio.sleep(0.12)
-        yield _sse({"type": "agent", "kind": "mapping", "agent": "Impact-Mapping",
-                    "message": f"mapped {len(links)} obligations · {gaps} gaps"})
+        yield node("supervisor", "running", detail="routing run")
         await asyncio.sleep(0.4)
-        yield _sse({"type": "agent", "kind": "prioritize", "agent": "Prioritization",
-                    "message": "ranked by deadline · effort · risk"})
-        await asyncio.sleep(0.4)
-        yield _sse({"type": "done", "message": "pipeline complete"})
 
-    return StreamingResponse(gen(), media_type="text/event-stream")
+        yield node("monitor", "running", detail="polling CELLAR / partner feeds")
+        await asyncio.sleep(0.6)
+        yield node("monitor", "done", f"1 in-scope event", parsed.celex)
+        await asyncio.sleep(0.2)
+
+        yield node("parser", "running", detail="Formex/XHTML → article tree")
+        await asyncio.sleep(0.7)
+        yield node("parser", "done", f"{len(parsed.articles)} articles", "Silver")
+        await asyncio.sleep(0.2)
+
+        yield node("obligation", "running", detail="extracting obligations (temp 0)")
+        yield node("guardrail", "running", detail="verifying each citation")
+        await asyncio.sleep(0.4)
+        # Stream a sample of obligations through the verifier for the live feel.
+        shown = obls[:24]
+        for o in shown:
+            yield _sse({"type": "verify", "id": o.id, "article": o.citation.article_ref,
+                        "ok": True, "obligation_type": o.obligation_type.value,
+                        "actor": o.actor, "action": o.action[:70]})
+            await asyncio.sleep(0.09)
+        if len(obls) > len(shown):
+            yield _sse({"type": "verify_more", "count": len(obls) - len(shown)})
+        yield node("obligation", "done", f"{len(obls)} obligations")
+        await asyncio.sleep(0.2)
+        yield node("guardrail", "done", f"{len(obls)} verified · {rejected} rejected",
+                   "citation integrity enforced")
+        await asyncio.sleep(0.2)
+
+        yield node("impact", "running", detail="mapping onto Synthetic Bank AG")
+        await asyncio.sleep(0.7)
+        yield node("impact", "done", f"{covered} covered · {gaps} gaps · {unmapped} unmapped")
+        await asyncio.sleep(0.2)
+
+        yield node("prioritize", "running", detail="scoring f(deadline, effort, risk)")
+        await asyncio.sleep(0.6)
+        yield node("prioritize", "done", f"ranked · top {top}")
+        await asyncio.sleep(0.2)
+
+        yield node("memo", "running", detail="drafting gap-assessment memo")
+        await asyncio.sleep(0.7)
+        yield node("memo", "done", "draft ready · awaiting human")
+        await asyncio.sleep(0.2)
+
+        yield node("audit", "done", f"{len(s['audit_trail'])} entries", "append-only provenance")
+        yield node("supervisor", "done", "run complete")
+        yield _sse({"type": "done"})
+
+    return StreamingResponse(gen(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 def _sse(payload: dict) -> str:
