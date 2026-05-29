@@ -1,0 +1,46 @@
+{
+  "name": "Synthetic Bank AG (Frankfurt) — fictional test entity",
+  "functions": [
+    {"id": "FN-RETAIL", "name": "Retail Banking", "description": "Deposits, lending, current accounts"},
+    {"id": "FN-PAYMENTS", "name": "Payments", "description": "Card and SEPA payment processing"},
+    {"id": "FN-CUSTODY", "name": "Custody & Securities Services", "description": "Safekeeping and settlement"},
+    {"id": "FN-TREASURY", "name": "Treasury", "description": "Liquidity, funding, market operations"},
+    {"id": "FN-ICT", "name": "ICT / Technology", "description": "Group-wide technology and operations"},
+    {"id": "FN-SEC", "name": "Information Security", "description": "CISO function: security controls and monitoring"},
+    {"id": "FN-BCM", "name": "Business Continuity", "description": "Continuity, crisis and recovery management"},
+    {"id": "FN-PROC", "name": "Procurement & Vendor Mgmt", "description": "Third-party sourcing and contracts"},
+    {"id": "FN-RISK", "name": "Risk & Compliance", "description": "Second-line risk, compliance, regulatory change"}
+  ],
+  "systems": [
+    {"id": "SYS-CORE", "name": "Core Banking Platform", "function_ids": ["FN-RETAIL", "FN-TREASURY"], "description": "System of record for accounts and ledgers"},
+    {"id": "SYS-PAYGW", "name": "Payment Gateway", "function_ids": ["FN-PAYMENTS"], "description": "Card and SEPA payment routing"},
+    {"id": "SYS-DWH", "name": "Data Warehouse", "function_ids": ["FN-RISK", "FN-ICT"], "description": "Regulatory and risk reporting data store"},
+    {"id": "SYS-CUST", "name": "Custody Settlement System", "function_ids": ["FN-CUSTODY"], "description": "Securities settlement and safekeeping"},
+    {"id": "SYS-CLOUD", "name": "Cloud Hosting (Vendor X)", "function_ids": ["FN-ICT"], "is_third_party": true, "description": "Third-party IaaS provider hosting core workloads"},
+    {"id": "SYS-SIEM", "name": "Security Monitoring (SIEM)", "function_ids": ["FN-SEC"], "description": "Security event detection and logging"},
+    {"id": "SYS-IAM", "name": "Identity & Access Management", "function_ids": ["FN-SEC", "FN-ICT"], "description": "Authentication, authorisation, privileged access"},
+    {"id": "SYS-CMDB", "name": "Configuration & Asset DB (CMDB)", "function_ids": ["FN-ICT"], "description": "ICT asset inventory and interdependencies"},
+    {"id": "SYS-BACKUP", "name": "Backup & Recovery Platform", "function_ids": ["FN-BCM", "FN-ICT"], "description": "Backups, redundancy and restoration"},
+    {"id": "SYS-VULN", "name": "Vulnerability Scanner", "function_ids": ["FN-SEC"], "description": "Vulnerability and patch tracking"}
+  ],
+  "controls": [
+    {"id": "CTL-001", "name": "ICT Risk Management Framework Policy", "description": "Board-approved ICT risk management framework with defined governance roles and management-body responsibility.", "covers_themes": ["ict-governance", "ict-risk-framework"], "system_ids": ["SYS-CORE", "SYS-DWH"], "function_ids": ["FN-ICT", "FN-RISK"]},
+    {"id": "CTL-002", "name": "ICT Incident Management Procedure", "description": "Documented process to detect, manage, log and follow up ICT-related incidents, with root-cause analysis.", "covers_themes": ["incident-management"], "system_ids": ["SYS-SIEM"], "function_ids": ["FN-ICT", "FN-SEC"]},
+    {"id": "CTL-003", "name": "ICT Third-Party Register & Oversight", "description": "Maintained register of contractual arrangements with ICT third-party service providers, with risk oversight.", "covers_themes": ["third-party-risk", "third-party-register"], "system_ids": ["SYS-CLOUD"], "function_ids": ["FN-PROC", "FN-RISK"]},
+    {"id": "CTL-004", "name": "ICT Asset Inventory & Classification", "description": "Maintained inventory of ICT assets, their classification and interdependencies in the CMDB.", "covers_themes": ["ict-asset-management"], "system_ids": ["SYS-CMDB"], "function_ids": ["FN-ICT"]},
+    {"id": "CTL-005", "name": "Access Control & Identity Management", "description": "Authentication, authorisation, least-privilege and privileged-access management.", "covers_themes": ["access-control"], "system_ids": ["SYS-IAM"], "function_ids": ["FN-SEC"]},
+    {"id": "CTL-006", "name": "Cryptography & Data Protection", "description": "Encryption of data in transit and at rest; cryptographic key management.", "covers_themes": ["data-protection"], "system_ids": ["SYS-CORE", "SYS-IAM"], "function_ids": ["FN-SEC"]},
+    {"id": "CTL-007", "name": "Security Monitoring & Anomaly Detection", "description": "Continuous monitoring, logging and detection of anomalous activities and early warning.", "covers_themes": ["ict-detection"], "system_ids": ["SYS-SIEM"], "function_ids": ["FN-SEC"]},
+    {"id": "CTL-008", "name": "ICT Response & Recovery Plans", "description": "Response and recovery procedures for ICT disruptions, including crisis communication.", "covers_themes": ["ict-response-recovery"], "system_ids": ["SYS-BACKUP"], "function_ids": ["FN-BCM", "FN-ICT"]},
+    {"id": "CTL-009", "name": "Backup & Restoration Policy", "description": "Backup procedures, redundancy and tested restoration with recovery objectives.", "covers_themes": ["backup-restoration"], "system_ids": ["SYS-BACKUP"], "function_ids": ["FN-ICT", "FN-BCM"]},
+    {"id": "CTL-010", "name": "Incident Classification Procedure", "description": "Classifies ICT-related incidents and cyber threats against materiality thresholds.", "covers_themes": ["incident-classification"], "system_ids": ["SYS-SIEM"], "function_ids": ["FN-SEC", "FN-RISK"]},
+    {"id": "CTL-011", "name": "Vulnerability & Patch Management", "description": "Identification, prioritisation and remediation of vulnerabilities and patches.", "covers_themes": ["vulnerability-management"], "system_ids": ["SYS-VULN"], "function_ids": ["FN-SEC", "FN-ICT"]},
+    {"id": "CTL-012", "name": "ICT Change Management", "description": "Controlled changes to ICT systems with testing and approval gates.", "covers_themes": ["change-management"], "system_ids": ["SYS-CMDB"], "function_ids": ["FN-ICT"]},
+    {"id": "CTL-013", "name": "ICT Internal Audit Programme", "description": "Independent internal audit reviews of the ICT risk management framework.", "covers_themes": ["ict-audit"], "system_ids": ["SYS-DWH"], "function_ids": ["FN-RISK"]},
+    {"id": "CTL-014", "name": "Security Awareness & Training", "description": "ICT security awareness programme and staff training, including the management body.", "covers_themes": ["training-awareness"], "system_ids": [], "function_ids": ["FN-SEC"]},
+    {"id": "CTL-015", "name": "Third-Party Contractual Controls", "description": "Key contractual provisions, service levels and termination rights for ICT services.", "covers_themes": ["third-party-contractual"], "system_ids": ["SYS-CLOUD"], "function_ids": ["FN-PROC"]},
+    {"id": "CTL-016", "name": "Network & Infrastructure Security", "description": "Network segmentation, perimeter and infrastructure hardening.", "covers_themes": ["network-security"], "system_ids": ["SYS-CLOUD", "SYS-SIEM"], "function_ids": ["FN-SEC", "FN-ICT"]},
+    {"id": "CTL-017", "name": "Business Continuity Management", "description": "ICT business continuity policy ensuring continuity of critical functions.", "covers_themes": ["business-continuity"], "system_ids": ["SYS-BACKUP"], "function_ids": ["FN-BCM"]},
+    {"id": "CTL-018", "name": "ICT Project & Acquisition Governance", "description": "Governance over ICT projects, development and acquisition of ICT systems.", "covers_themes": ["ict-acquisition"], "system_ids": ["SYS-CMDB"], "function_ids": ["FN-ICT"]}
+  ]
+}

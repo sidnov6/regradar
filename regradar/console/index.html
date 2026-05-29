@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>RegRadar · KOMPASS</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script>
+  tailwind.config = {
+    theme: { extend: {
+      colors: {
+        ink: '#0a0a0f', panel: '#121219', panel2: '#16161f', line: 'rgba(255,255,255,.07)',
+        accent: '#818cf8', accent2: '#6366f1',
+        danger: '#f87171', warn: '#fbbf24', ok: '#34d399', info: '#60a5fa', muted: '#8a8a99',
+      },
+      fontFamily: { sans: ['Inter','system-ui','sans-serif'], mono: ['"JetBrains Mono"','ui-monospace','monospace'] },
+    }}
+  }
+</script>
+<style>
+  body{background:radial-gradient(1200px 600px at 80% -10%, #1a1a2e 0%, #0a0a0f 55%);}
+  .hair{border:1px solid rgba(255,255,255,.07)}
+  .card{background:linear-gradient(180deg,#15151e,#111118);border:1px solid rgba(255,255,255,.07);border-radius:14px}
+  .glow-danger{box-shadow:0 0 0 1px rgba(248,113,113,.4), 0 0 22px -6px rgba(248,113,113,.55)}
+  .tab.active{color:#fff;background:rgba(129,140,248,.14);border-color:rgba(129,140,248,.4)}
+  .mono{font-family:"JetBrains Mono",monospace}
+  .anchor-hl{background:rgba(129,140,248,.22);border-bottom:1px solid rgba(129,140,248,.7);border-radius:3px;padding:0 2px}
+  .memo h1{font-size:1.4rem;font-weight:700;margin:.2rem 0 .6rem;border-bottom:1px solid rgba(255,255,255,.1);padding-bottom:.4rem}
+  .memo h2{font-size:1.05rem;font-weight:600;color:#a5b4fc;margin:1.2rem 0 .4rem}
+  .memo table{width:100%;border-collapse:collapse;font-size:.78rem;margin:.5rem 0}
+  .memo th,.memo td{border:1px solid rgba(255,255,255,.1);padding:.35rem .5rem;text-align:left;vertical-align:top}
+  .memo th{background:rgba(255,255,255,.04)}
+  .memo blockquote{border-left:2px solid #6366f1;margin:.3rem 0;padding:.1rem .7rem;color:#9a9aa8;font-family:"JetBrains Mono",monospace;font-size:.72rem}
+  .memo em{color:#8a8a99}
+  ::-webkit-scrollbar{width:9px;height:9px}::-webkit-scrollbar-thumb{background:#2a2a38;border-radius:9px}
+  .pulse{animation:p 1.4s ease-in-out infinite}@keyframes p{0%,100%{opacity:.4}50%{opacity:1}}
+  .fade{animation:f .35s ease}@keyframes f{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+</style>
+</head>
+<body class="text-slate-200 font-sans min-h-screen">
+
+<!-- Top bar -->
+<header class="sticky top-0 z-20 backdrop-blur bg-ink/70 border-b border-line">
+  <div class="max-w-[1240px] mx-auto px-5 py-3 flex items-center gap-4">
+    <div class="flex items-center gap-2.5">
+      <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-accent2 to-indigo-400 grid place-items-center font-bold text-white">R</div>
+      <div>
+        <div class="font-semibold tracking-tight leading-none">RegRadar <span class="text-muted font-normal">· KOMPASS</span></div>
+        <div class="text-[11px] text-muted leading-none mt-1">Agentic EU Regulatory-Impact Engine</div>
+      </div>
+    </div>
+    <nav id="tabs" class="flex gap-1.5 ml-6 text-sm"></nav>
+    <div class="ml-auto flex items-center gap-2 text-[11px]" id="providers"></div>
+  </div>
+</header>
+
+<main class="max-w-[1240px] mx-auto px-5 py-6">
+  <section id="screen" class="fade"></section>
+</main>
+
+<script>
+const TABS = [
+  ['radar','Radar Feed'], ['workbench','Obligation Workbench'], ['impact','Impact Map'],
+  ['memo','Memo Studio'], ['audit','Audit & Trace'],
+];
+let STATE=null, DOC=null, AUDIT=null;
+const $ = (h)=>{const t=document.createElement('template');t.innerHTML=h.trim();return t.content.firstChild;};
+const api = (p,o)=>fetch(p,o).then(r=>r.json());
+
+function chip(text, color){ return `<span class="px-2 py-0.5 rounded-full text-[11px] mono" style="background:${color}22;color:${color};border:1px solid ${color}55">${text}</span>`; }
+const TYPE_COLORS={reporting:'#60a5fa',governance:'#a78bfa','ict-control':'#34d399',disclosure:'#fbbf24',capital:'#f472b6',conduct:'#22d3ee','record-keeping':'#94a3b8'};
+
+async function boot(){
+  STATE = await api('/api/state');
+  document.getElementById('providers').innerHTML =
+    STATE.providers.map(p=>chip(p, p==='mock'?'#fbbf24':'#34d399')).join('') +
+    chip(STATE.celex, '#818cf8');
+  const nav=document.getElementById('tabs');
+  TABS.forEach(([id,label])=>{
+    const b=$(`<button class="tab hair rounded-lg px-3 py-1.5 text-muted hover:text-white transition" data-id="${id}">${label}</button>`);
+    b.onclick=()=>go(id); nav.appendChild(b);
+  });
+  go('radar');
+}
+function go(id){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.id===id));
+  const s=document.getElementById('screen'); s.classList.remove('fade'); void s.offsetWidth; s.classList.add('fade');
+  ({radar:radar,workbench:workbench,impact:impact,memo:memo,audit:audit})[id]();
+}
+
+/* ---------------- Radar Feed ---------------- */
+function counter(label,val,color,sub){return `
+  <div class="card p-4">
+    <div class="text-[11px] uppercase tracking-wider text-muted">${label}</div>
+    <div class="text-3xl font-semibold mt-1" style="color:${color||'#fff'}">${val}</div>
+    <div class="text-[11px] text-muted mt-1">${sub||''}</div>
+  </div>`;}
+function radar(){
+  const c=STATE.counters;
+  const overdue = c.nearest_deadline_days!==null && c.nearest_deadline_days<0;
+  document.getElementById('screen').innerHTML = `
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+      ${counter('Obligations', c.obligations, '#fff', 'extracted & verified')}
+      ${counter('Open gaps', c.gaps, '#f87171', 'of '+(c.in_scope??c.covered+c.gaps)+' in-scope obligations')}
+      ${counter('Coverage', c.coverage_pct+'%', '#34d399', c.covered+' mapped · '+(c.unmapped||0)+' unmapped/review')}
+      ${counter('Nearest deadline', overdue?'OVERDUE':(c.nearest_deadline_days??'—'), overdue?'#f87171':'#fbbf24', overdue?'past application date':'days')}
+    </div>
+    <div class="grid md:grid-cols-3 gap-4">
+      <div class="md:col-span-2 card p-5">
+        <div class="flex items-center gap-2 mb-3">
+          <div class="text-xs uppercase tracking-wider text-muted">Incoming regulatory event</div>
+          ${STATE.counters.needs_human_gate?chip('HUMAN GATE OPEN','#fbbf24'):chip('CLEAR','#34d399')}
+        </div>
+        <div class="text-lg font-medium leading-snug">${STATE.title}</div>
+        <div class="flex flex-wrap gap-2 mt-3">
+          ${chip(STATE.celex,'#818cf8')} ${chip(STATE.language.toUpperCase(),'#60a5fa')}
+          ${chip(STATE.obligations.length+' obligations','#34d399')} ${chip(c.gaps+' gaps','#f87171')}
+          ${chip(c.flags+' flags','#fbbf24')}
+        </div>
+        <div class="text-[11px] text-muted mono mt-3">corpus ${STATE.corpus_version} · status: ${STATE.status}</div>
+        <div class="mt-4"><button onclick="go('workbench')" class="text-sm text-accent hover:underline">Open Obligation Workbench →</button></div>
+      </div>
+      <div class="card p-5">
+        <div class="flex items-center justify-between mb-2">
+          <div class="text-xs uppercase tracking-wider text-muted">Agent pipeline</div>
+          <button id="run" class="text-[11px] text-accent hover:underline">▶ watch live</button>
+        </div>
+        <div id="stream" class="space-y-1.5 text-[12px] mono max-h-[300px] overflow-auto"></div>
+      </div>
+    </div>`;
+  document.getElementById('run').onclick=runStream;
+  renderStreamStatic();
+}
+function renderStreamStatic(){
+  const el=document.getElementById('stream');
+  el.innerHTML = ['Source-Monitor','Parser / Intake','Obligation-Extraction','Citation-Verifier','Impact-Mapping','Prioritization']
+    .map(a=>`<div class="flex items-center gap-2 text-muted"><span class="text-ok">●</span> ${a}</div>`).join('');
+}
+function runStream(){
+  const el=document.getElementById('stream'); el.innerHTML='';
+  const es=new EventSource('/api/stream');
+  es.onmessage=(e)=>{
+    const d=JSON.parse(e.data);
+    let line='';
+    if(d.type==='agent') line=`<span class="text-accent">▸ ${d.agent}</span> <span class="text-muted">${d.message}</span>`;
+    else if(d.type==='obligation') line=`<span class="text-ok">✓ verified</span> <span class="text-muted">${d.id} · ${d.article}</span>`;
+    else if(d.type==='done'){line=`<span class="text-ok">■ ${d.message}</span>`;es.close();}
+    const row=$(`<div class="fade">${line}</div>`); el.appendChild(row); el.scrollTop=el.scrollHeight;
+  };
+  es.onerror=()=>es.close();
+}
+
+/* ---------------- Obligation Workbench ---------------- */
+async function workbench(){
+  if(!DOC) DOC=await api('/api/document');
+  const obByArticle={};
+  STATE.obligations.forEach(o=>{(obByArticle[normArt(o.citation.article_ref)] ||= []).push(o);});
+  const screen=document.getElementById('screen');
+  screen.innerHTML=`
+    <div class="grid md:grid-cols-2 gap-4">
+      <div class="card p-4 max-h-[72vh] overflow-auto">
+        <div class="text-xs uppercase tracking-wider text-muted mb-2">Source text · ${DOC.celex}</div>
+        <div id="src" class="space-y-4 text-sm leading-relaxed"></div>
+      </div>
+      <div class="card p-4 max-h-[72vh] overflow-auto">
+        <div class="text-xs uppercase tracking-wider text-muted mb-2">Extracted obligations · ${STATE.obligations.length}</div>
+        <div id="obls" class="space-y-2"></div>
+      </div>
+    </div>`;
+  const src=screen.querySelector('#src');
+  DOC.articles.forEach(a=>{
+    const obls=obByArticle[a.number]||[];
+    const anchors=obls.map(o=>o.citation.anchor_quote);
+    const body=a.paragraphs.map(p=>`<div class="text-slate-300"><span class="mono text-muted">¶${p.ref}</span> ${highlight(p.text,anchors)}</div>`).join('');
+    src.appendChild($(`<div id="art-${a.number}" class="scroll-mt-4">
+      <div class="mono text-accent text-sm">${a.label}</div>
+      <div class="text-slate-400 text-[13px] mb-1">${a.title}</div>
+      <div class="space-y-1.5">${body}</div></div>`));
+  });
+  const ob=screen.querySelector('#obls');
+  STATE.obligations.forEach(o=>{
+    const tc=TYPE_COLORS[o.obligation_type]||'#94a3b8';
+    const card=$(`<div class="hair rounded-lg p-3 hover:bg-white/[.03] cursor-pointer transition">
+      <div class="flex items-center justify-between gap-2">
+        <span class="mono text-[12px] text-slate-300">${o.citation.article_ref}${o.citation.paragraph_ref?'('+o.citation.paragraph_ref+')':''}</span>
+        ${chip(o.obligation_type,tc)}
+      </div>
+      <div class="text-[13px] mt-1.5"><span class="text-muted">${o.actor}</span> <span class="text-white">${o.modal_force}</span> ${o.action}</div>
+      <div class="flex items-center gap-2 mt-2">
+        <span class="text-[11px] text-ok">✓ citation verified</span>
+        <span class="text-[11px] text-muted mono">${o.id}</span>
+      </div></div>`);
+    card.onclick=()=>{const t=document.getElementById('art-'+normArt(o.citation.article_ref));if(t){t.scrollIntoView({behavior:'smooth',block:'start'});t.classList.add('glow-danger');setTimeout(()=>t.classList.remove('glow-danger'),900);}};
+    ob.appendChild(card);
+  });
+}
+function normArt(ref){const m=(ref||'').toLowerCase().match(/\d+[a-z]?/);return m?m[0]:ref;}
+function highlight(text,anchors){
+  let out=escapeHtml(text);
+  anchors.forEach(a=>{const t=escapeHtml(a).slice(0,60);const i=out.indexOf(t.slice(0,40));if(i>=0){/* simple span wrap on first 40 chars match */}});
+  // wrap any anchor substring present
+  anchors.forEach(a=>{const frag=escapeHtml(a);if(out.includes(frag)){out=out.replace(frag,`<span class="anchor-hl">${frag}</span>`);}
+    else{const short=escapeHtml(a).split(' ').slice(0,8).join(' ');if(out.includes(short))out=out.replace(short,`<span class="anchor-hl">${short}</span>`);}});
+  return out;
+}
+function escapeHtml(s){return s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+
+/* ---------------- Impact Map ---------------- */
+function impact(){
+  const links=STATE.impact_links;
+  const byControl={}; const gaps=[]; const unmapped=[];
+  links.forEach(l=>{
+    if(l.status==='gap') gaps.push(l);
+    else if(l.status==='unmapped') unmapped.push(l);
+    else (byControl[l.control_id] ||= {control:l.control_id,function:l.function,items:[]}).items.push(l);
+  });
+  const obl=(id)=>STATE.obligations.find(o=>o.id===id);
+  const linkRow=(l)=>{const o=obl(l.obligation_id);return `<div class="text-[12px] text-slate-300 flex items-center gap-2"><span class="mono text-muted shrink-0">${o?o.citation.article_ref:''}</span> <span class="truncate">${o?o.action.slice(0,60):l.obligation_id}</span></div>`;};
+  const coveredCount = Object.values(byControl).reduce((n,c)=>n+c.items.length,0);
+  document.getElementById('screen').innerHTML=`
+    <div class="mb-4 text-sm text-muted">Obligation → function → system → control for <span class="text-white">${STATE.title.split('(')[0].trim()}</span>.
+      <span class="text-ok">${coveredCount} covered</span> · <span class="text-danger">${gaps.length} gaps</span> · <span class="text-muted">${unmapped.length} unmapped/review</span>.</div>
+    <div class="grid md:grid-cols-2 gap-4">
+      <div class="space-y-3">
+        <div class="text-xs uppercase tracking-wider text-muted">Covered by existing controls (${Object.keys(byControl).length} controls)</div>
+        ${Object.values(byControl).sort((a,b)=>b.items.length-a.items.length).map(c=>`
+          <div class="card p-4">
+            <div class="flex items-center justify-between"><span class="mono text-ok">${c.control}</span>${chip(c.items.length+' obligations','#34d399')}</div>
+            <div class="text-[11px] text-muted mt-0.5">${c.function}</div>
+            <div class="mt-2 space-y-1">${c.items.slice(0,6).map(linkRow).join('')}${c.items.length>6?`<div class="text-[11px] text-muted">+ ${c.items.length-6} more…</div>`:''}</div>
+          </div>`).join('')}
+      </div>
+      <div class="space-y-3">
+        <div class="text-xs uppercase tracking-wider text-danger">Gaps — no covering control (${gaps.length})</div>
+        ${gaps.map(g=>{const o=obl(g.obligation_id);return `
+          <div class="card glow-danger p-4">
+            <div class="flex items-center justify-between"><span class="mono text-danger">⚠ ${o?o.citation.article_ref:g.obligation_id}</span>${chip(g.function,'#f87171')}</div>
+            <div class="text-[13px] mt-1.5 text-slate-200">${o?o.action.slice(0,90):''}</div>
+            <div class="text-[11px] text-muted mt-1">${g.rationale}</div>
+          </div>`;}).join('')}
+        <div class="text-xs uppercase tracking-wider text-muted mt-4">Unmapped — review / likely out of scope (${unmapped.length})</div>
+        <div class="card p-4 space-y-1 max-h-[260px] overflow-auto">
+          ${unmapped.map(u=>{const o=obl(u.obligation_id);return `<div class="text-[12px] text-muted flex gap-2"><span class="mono shrink-0">${o?o.citation.article_ref:''}</span><span class="truncate">${o?o.action.slice(0,64):u.obligation_id}</span></div>`;}).join('')||'<div class="text-[12px] text-muted">none</div>'}
+        </div>
+      </div>
+    </div>`;
+}
+
+/* ---------------- Memo Studio ---------------- */
+let MEMO=null;
+function memo(){
+  document.getElementById('screen').innerHTML=`
+    <div class="flex items-center gap-3 mb-4">
+      <div class="text-xs uppercase tracking-wider text-muted">Language</div>
+      <div class="hair rounded-lg overflow-hidden flex text-sm">
+        <button class="lang px-3 py-1.5" data-l="en">EN</button>
+        <button class="lang px-3 py-1.5" data-l="de">DE</button>
+      </div>
+      <button id="gen" class="bg-accent2 hover:bg-indigo-500 text-white text-sm rounded-lg px-4 py-1.5">Generate memo</button>
+      <div id="mstatus" class="text-sm ml-2"></div>
+      <div class="ml-auto flex gap-2">
+        <a href="/api/memo/export?format=md" class="hair rounded-lg px-3 py-1.5 text-sm hover:bg-white/5">Export .md</a>
+        <a href="/api/memo/export?format=html" target="_blank" class="hair rounded-lg px-3 py-1.5 text-sm hover:bg-white/5">Export HTML / Print PDF</a>
+      </div>
+    </div>
+    <div class="card p-6 max-h-[64vh] overflow-auto memo" id="memobody">
+      <div class="text-muted text-sm">Pick a language and click <span class="text-white">Generate memo</span>. The agent drafts the gap-assessment; you approve or reject (human gate).</div>
+    </div>
+    <div class="flex items-center gap-3 mt-4">
+      <button id="approve" class="bg-ok/90 hover:bg-ok text-black font-medium text-sm rounded-lg px-4 py-2" disabled>✓ Approve & issue</button>
+      <button id="reject" class="hair text-danger text-sm rounded-lg px-4 py-2" disabled>Reject</button>
+      <div class="text-[12px] text-muted">Nothing is issued without sign-off.</div>
+    </div>`;
+  let lang='en';
+  const setLang=(l)=>{lang=l;document.querySelectorAll('.lang').forEach(b=>b.classList.toggle('text-white',b.dataset.l===l));document.querySelectorAll('.lang').forEach(b=>b.classList.toggle('bg-white/10',b.dataset.l===l));};
+  document.querySelectorAll('.lang').forEach(b=>b.onclick=()=>setLang(b.dataset.l)); setLang('en');
+  document.getElementById('gen').onclick=async()=>{
+    document.getElementById('memobody').innerHTML='<span class="pulse text-accent">drafting…</span>';
+    MEMO=await api('/api/memo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({language:lang})});
+    document.getElementById('memobody').innerHTML=marked.parse(MEMO.markdown);
+    document.getElementById('mstatus').innerHTML=chip('DRAFT · '+MEMO.citations+' citations','#fbbf24');
+    document.getElementById('approve').disabled=false; document.getElementById('reject').disabled=false;
+    document.querySelectorAll('a[href^="/api/memo/export"]').forEach(a=>a.href=a.href.split('&')[0]+'&language='+lang);
+  };
+  const decide=async(path,color,label)=>{const r=await api(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({approver:'reviewer'})});document.getElementById('mstatus').innerHTML=chip(label+' by '+r.approver,color);};
+  document.getElementById('approve').onclick=()=>decide('/api/memo/approve','#34d399','APPROVED');
+  document.getElementById('reject').onclick=()=>decide('/api/memo/reject','#f87171','REJECTED');
+}
+
+/* ---------------- Audit & Trace ---------------- */
+async function audit(){
+  if(!AUDIT) AUDIT=await api('/api/audit');
+  const rows=AUDIT.map(a=>{
+    const v=a.verifier_verdict; const vtxt=v?(v.ok?'<span class="text-ok">✓ pass</span>':'<span class="text-danger">✗ '+escapeHtml(v.reason).slice(0,40)+'</span>'):'<span class="text-muted">—</span>';
+    return `<tr class="border-t border-line">
+      <td class="py-1.5 pr-3 mono text-[12px] text-accent">${a.node}</td>
+      <td class="pr-3 text-[12px] text-muted">${a.provider||''} ${a.model?('· '+a.model):''}</td>
+      <td class="pr-3 text-[12px]">${a.evidence_refs.join(', ')||''}</td>
+      <td class="pr-3 text-[12px]">${a.confidence!=null?a.confidence.toFixed(2):''}</td>
+      <td class="pr-3 text-[12px]">${vtxt}</td>
+      <td class="text-[11px] mono text-muted">${a.corpus_version||''}</td></tr>`;}).join('');
+  document.getElementById('screen').innerHTML=`
+    <div class="card p-5">
+      <div class="flex items-center gap-2 mb-3"><div class="text-xs uppercase tracking-wider text-muted">Append-only audit trail</div>${chip(AUDIT.length+' entries','#818cf8')}</div>
+      <div class="text-[12px] text-muted mb-3">Every decision logs model, evidence, confidence, and the citation-verifier verdict — the reproducibility + provenance substrate. This is the trust weapon.</div>
+      <div class="overflow-auto max-h-[64vh]"><table class="w-full text-left">
+        <thead><tr class="text-[11px] uppercase tracking-wider text-muted"><th class="pb-2 pr-3">Node</th><th class="pr-3">Model</th><th class="pr-3">Evidence</th><th class="pr-3">Conf</th><th class="pr-3">Verifier</th><th>Corpus</th></tr></thead>
+        <tbody>${rows}</tbody></table></div>
+    </div>`;
+}
+
+boot();
+</script>
+</body>
+</html>

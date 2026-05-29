@@ -1,0 +1,30 @@
+[project]
+name = "regradar"
+version = "0.1.0"
+description = "Agentic EU Regulatory-Impact Engine (RegRadar / KOMPASS)"
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.6",
+    "httpx>=0.27",
+    "lxml>=5.2",
+    "python-dotenv>=1.0",
+    "rapidfuzz>=3.9",
+]
+
+[project.optional-dependencies]
+# Wired in later phases. Kept optional so the Phase 0+1 keystone installs
+# and runs with no LLM keys and a minimal dependency set.
+llm = ["litellm>=1.40", "groq>=0.9"]
+app = ["fastapi>=0.110", "uvicorn[standard]>=0.29", "markdown>=3.6"]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "httpx>=0.27"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["regradar*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

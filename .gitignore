@@ -1,0 +1,25 @@
+# secrets — never commit
+.env
+.env.local
+*.key
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# data artifacts (regenerable from pinned sources / re-runnable)
+regradar/data/bronze/store/
+regradar/data/silver/store/
+regradar/data/gold/store/
+regradar/data/.llm_cache/
+regradar/data/sources/seen_celex.json
+
+# os / editor
+.DS_Store
+.idea/
+.vscode/

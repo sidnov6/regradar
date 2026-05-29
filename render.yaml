@@ -1,0 +1,16 @@
+# Render.com blueprint — deploy RegRadar (API + console) as one free web service.
+# Connect this repo in Render, set the two secret env vars, and deploy.
+services:
+  - type: web
+    name: regradar
+    runtime: python
+    plan: free
+    buildCommand: pip install ".[llm,app]"
+    startCommand: uvicorn regradar.server:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false          # set in the Render dashboard (secret)
+      - key: GOOGLE_API_KEY
+        sync: false          # set in the Render dashboard (secret)
+      - key: PYTHON_VERSION
+        value: "3.11.9"

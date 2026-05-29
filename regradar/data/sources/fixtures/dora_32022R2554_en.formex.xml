@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Offline test fixture: selected articles of Regulation (EU) 2022/2554 (DORA),
+  CELEX 32022R2554, English manifestation, encoded in a Formex-like vocabulary
+  matching regradar.agents.parser.formex. Article wording reproduces the official
+  text so the citation verifier checks against genuine legal language. This is a
+  curated subset (the ground-truth oracle covers these articles), not the full Act.
+-->
+<ACT>
+  <TI.DOC>Regulation (EU) 2022/2554 on digital operational resilience for the financial sector (DORA)</TI.DOC>
+
+  <DIVISION>
+    <TI>CHAPTER II — ICT risk management</TI>
+
+    <ARTICLE IDENTIFIER="005">
+      <TI.ART>Article 5</TI.ART>
+      <STI.ART>Governance and organisation</STI.ART>
+      <PARAG>
+        <NO.PARAG>1.</NO.PARAG>
+        <ALINEA>Financial entities shall have in place an internal governance and control framework that ensures an effective and prudent management of ICT risk, in accordance with Article 6(4), in order to achieve a high level of digital operational resilience.</ALINEA>
+      </PARAG>
+      <PARAG>
+        <NO.PARAG>2.</NO.PARAG>
+        <ALINEA>The management body of the financial entity shall define, approve, oversee and be responsible for the implementation of all arrangements related to the ICT risk management framework referred to in Article 6(1).</ALINEA>
+      </PARAG>
+    </ARTICLE>
+
+    <ARTICLE IDENTIFIER="006">
+      <TI.ART>Article 6</TI.ART>
+      <STI.ART>ICT risk management framework</STI.ART>
+      <PARAG>
+        <NO.PARAG>1.</NO.PARAG>
+        <ALINEA>Financial entities shall have a sound, comprehensive and well-documented ICT risk management framework as part of their overall risk management system, which enables them to address ICT risk quickly, efficiently and comprehensively and to ensure a high level of digital operational resilience.</ALINEA>
+      </PARAG>
+      <PARAG>
+        <NO.PARAG>2.</NO.PARAG>
+        <ALINEA>The ICT risk management framework referred to in paragraph 1 shall include at least strategies, policies, procedures, ICT protocols and tools that are necessary to duly and adequately protect all information assets and ICT assets.</ALINEA>
+      </PARAG>
+    </ARTICLE>
+  </DIVISION>
+
+  <DIVISION>
+    <TI>CHAPTER III — ICT-related incident management, classification and reporting</TI>
+
+    <ARTICLE IDENTIFIER="017">
+      <TI.ART>Article 17</TI.ART>
+      <STI.ART>ICT-related incident management process</STI.ART>
+      <PARAG>
+        <NO.PARAG>1.</NO.PARAG>
+        <ALINEA>Financial entities shall define, establish and implement an ICT-related incident management process to detect, manage and notify ICT-related incidents.</ALINEA>
+      </PARAG>
+      <PARAG>
+        <NO.PARAG>2.</NO.PARAG>
+        <ALINEA>Financial entities shall record all ICT-related incidents and significant cyber threats. Financial entities shall establish appropriate procedures and processes to ensure a consistent and integrated monitoring, handling and follow-up of ICT-related incidents, to ensure that the root causes are identified, documented and addressed in order to prevent the occurrence of such incidents.</ALINEA>
+      </PARAG>
+    </ARTICLE>
+
+    <ARTICLE IDENTIFIER="019">
+      <TI.ART>Article 19</TI.ART>
+      <STI.ART>Reporting of major ICT-related incidents and voluntary notification of significant cyber threats</STI.ART>
+      <PARAG>
+        <NO.PARAG>1.</NO.PARAG>
+        <ALINEA>Financial entities shall report major ICT-related incidents to the relevant competent authority referred to in Article 46 in accordance with paragraph 4 of this Article.</ALINEA>
+      </PARAG>
+      <PARAG>
+        <NO.PARAG>3.</NO.PARAG>
+        <ALINEA>Financial entities shall submit to the relevant competent authority the following:</ALINEA>
+        <LIST>
+          <ITEM><NO.P>(a)</NO.P><TXT>an initial notification;</TXT></ITEM>
+          <ITEM><NO.P>(b)</NO.P><TXT>an intermediate report after the initial notification, as soon as the status of the original incident has changed significantly;</TXT></ITEM>
+          <ITEM><NO.P>(c)</NO.P><TXT>a final report, when the root cause analysis has been completed.</TXT></ITEM>
+        </LIST>
+      </PARAG>
+    </ARTICLE>
+  </DIVISION>
+
+  <DIVISION>
+    <TI>CHAPTER IV — Digital operational resilience testing</TI>
+
+    <ARTICLE IDENTIFIER="024">
+      <TI.ART>Article 24</TI.ART>
+      <STI.ART>General requirements for the performance of digital operational resilience testing</STI.ART>
+      <PARAG>
+        <NO.PARAG>1.</NO.PARAG>
+        <ALINEA>For the purpose of assessing preparedness for handling ICT-related incidents, of identifying weaknesses, deficiencies and gaps in digital operational resilience, and of promptly implementing corrective measures, financial entities, other than microenterprises, shall, taking into account the criteria set out in Article 4(2), establish, maintain and review a sound and comprehensive digital operational resilience testing programme as an integral part of the ICT risk management framework referred to in Article 6.</ALINEA>
+      </PARAG>
+    </ARTICLE>
+  </DIVISION>
+
+  <DIVISION>
+    <TI>CHAPTER V — Managing of ICT third-party risk</TI>
+
+    <ARTICLE IDENTIFIER="028">
+      <TI.ART>Article 28</TI.ART>
+      <STI.ART>General principles</STI.ART>
+      <PARAG>
+        <NO.PARAG>1.</NO.PARAG>
+        <ALINEA>Financial entities shall manage ICT third-party risk as an integral component of ICT risk within their ICT risk management framework, and in accordance with the following principles.</ALINEA>
+      </PARAG>
+      <PARAG>
+        <NO.PARAG>3.</NO.PARAG>
+        <ALINEA>Financial entities shall maintain and update at entity level, and at sub-consolidated and consolidated levels, a register of information in relation to all contractual arrangements on the use of ICT services provided by ICT third-party service providers.</ALINEA>
+      </PARAG>
+    </ARTICLE>
+  </DIVISION>
+</ACT>
